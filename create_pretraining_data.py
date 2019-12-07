@@ -388,6 +388,13 @@ MaskedLmInstance = collections.namedtuple("MaskedLmInstance",
                                           ["index", "label"])
 
 
+def _is_in_chars(piece, chars):
+  if isinstance(piece, six.binary_type):
+    return False
+  else:
+    return all([i.lower() in chars for i in piece])
+
+
 def _is_start_piece_sp(piece):
   """Check if the current word piece is the starting piece (sentence piece)."""
   special_pieces = set(list('!"#$%&\"()*+,-./:;?@[\\]^_`{|}~'))
@@ -398,8 +405,7 @@ def _is_start_piece_sp(piece):
   english_chars = set(list("abcdefghijklmnopqrstuvwhyz"))
   if (six.ensure_str(piece).startswith("▁") or
       six.ensure_str(piece).startswith("<") or piece in special_pieces or
-      not all([i.lower() in english_chars.union(special_pieces)
-               for i in piece])):
+      not _is_in_chars(piece, english_chars.union(special_pieces))):
     return True
   else:
     return False
