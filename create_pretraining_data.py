@@ -21,12 +21,14 @@ from __future__ import division
 from __future__ import print_function
 import collections
 import random
+from multiprocessing.pool import Pool
 import tokenization
 import numpy as np
 import six
 from six.moves import range
 from six.moves import zip
 import tensorflow as tf
+from tqdm import tqdm
 
 flags = tf.flags
 
@@ -212,6 +214,17 @@ def create_float_feature(values):
   return feature
 
 
+def f(args):
+  instances = []
+  all_documents, max_seq_length, short_seq_prob, \
+        masked_lm_prob, max_predictions_per_seq, vocab_words, rng = args
+  for document_index in range(len(all_documents)):
+    instances.extend(create_instances_from_document(
+        all_documents, document_index, max_seq_length, short_seq_prob,
+        masked_lm_prob, max_predictions_per_seq, vocab_words, rng))
+  return instances
+
+
 def create_training_instances(input_files, tokenizer, max_seq_length,
                               dupe_factor, short_seq_prob, masked_lm_prob,
                               max_predictions_per_seq, rng):
@@ -250,12 +263,13 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
 
   vocab_words = list(tokenizer.vocab.keys())
   instances = []
-  for _ in range(dupe_factor):
-    for document_index in range(len(all_documents)):
-      instances.extend(
-          create_instances_from_document(
-              all_documents, document_index, max_seq_length, short_seq_prob,
-              masked_lm_prob, max_predictions_per_seq, vocab_words, rng))
+
+  args = [(all_documents, max_seq_length, short_seq_prob,
+          masked_lm_prob, max_predictions_per_seq, vocab_words, rng)]
+  args = args * dupe_factor
+  pool = Pool(len(args))
+  for result in tqdm(pool.imap(f, args)):
+    instances.extend(result)
 
   rng.shuffle(instances)
   return instances
