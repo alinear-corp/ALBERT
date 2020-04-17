@@ -20,10 +20,10 @@ from __future__ import division
 from __future__ import print_function
 import os
 import time
-import modeling
-import optimization
+from albert import modeling
+from albert import optimization
 from six.moves import range
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
 from tensorflow.contrib import data as contrib_data
 from tensorflow.contrib import tpu as contrib_tpu
@@ -46,9 +46,6 @@ flags.DEFINE_string(
     "output_dir", None,
     "The output directory where the model checkpoints will be written.")
 
-flags.DEFINE_string(
-    "export_dir", None,
-    "The output directory where the saved models will be written.")
 ## Other parameters
 flags.DEFINE_string(
     "init_checkpoint", None,
@@ -542,7 +539,6 @@ def main(_):
     global_step = -1
     output_eval_file = os.path.join(FLAGS.output_dir, "eval_results.txt")
     writer = tf.gfile.GFile(output_eval_file, "w")
-    tf.gfile.MakeDirs(FLAGS.export_dir)
     eval_input_fn = input_fn_builder(
         input_files=input_files,
         max_seq_length=FLAGS.max_seq_length,

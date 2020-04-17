@@ -1,5 +1,6 @@
 #!/bin/bash
 # Small integration test script.
+# The values in this file are **not** meant for reproducing actual results.
 
 set -e
 set -x
@@ -9,13 +10,11 @@ source ./bin/activate
 
 OUTPUT_DIR_BASE="$(mktemp -d)"
 OUTPUT_DIR="${OUTPUT_DIR_BASE}/output"
-EXPORT_DIR="${OUTPUT_DIR_BASE}/export"
 
 pip install numpy
 pip install -r requirements.txt
 python -m run_pretraining_test \
     --output_dir="${OUTPUT_DIR}" \
-    --export_dir="${EXPORT_DIR}" \
     --do_train \
     --do_eval \
     --nouse_tpu \

@@ -22,13 +22,13 @@ from __future__ import print_function
 import collections
 import random
 from multiprocessing.pool import Pool
-import tokenization
+from ALBERT import tokenization
 import numpy as np
 import six
 from six.moves import range
 from six.moves import zip
-import tensorflow as tf
 from tqdm import tqdm
+import tensorflow.compat.v1 as tf
 
 flags = tf.flags
 
@@ -48,6 +48,9 @@ flags.DEFINE_string(
 flags.DEFINE_string("spm_model_file", None,
                     "The model file for sentence piece tokenization.")
 
+flags.DEFINE_string("input_file_mode", "r",
+                    "The data format of the input file.")
+
 flags.DEFINE_bool(
     "do_lower_case", True,
     "Whether to lower case the input text. Should be True for uncased "
@@ -62,7 +65,7 @@ flags.DEFINE_bool(
     "Whether to do the permutation training.")
 
 flags.DEFINE_bool(
-    "favor_shorter_ngram", False,
+    "favor_shorter_ngram", True,
     "Whether to set higher probabilities for sampling shorter ngrams.")
 
 flags.DEFINE_bool(
@@ -238,7 +241,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   # (2) Blank lines between documents. Document boundaries are needed so
   # that the "next sentence prediction" task doesn't span between documents.
   for input_file in input_files:
-    with tf.gfile.GFile(input_file, "r") as reader:
+    with tf.gfile.GFile(input_file, FLAGS.input_file_mode) as reader:
       while True:
         line = reader.readline()
         if not FLAGS.spm_model_file:
@@ -416,7 +419,7 @@ def _is_start_piece_sp(piece):
   special_pieces.add(u"£".encode("utf-8"))
   # Note(mingdachen):
   # For foreign characters, we always treat them as a whole piece.
-  english_chars = set(list("abcdefghijklmnopqrstuvwhyz"))
+  english_chars = set(list("abcdefghijklmnopqrstuvwxyz"))
   if (six.ensure_str(piece).startswith("▁") or
       six.ensure_str(piece).startswith("<") or piece in special_pieces or
       not _is_in_chars(piece, english_chars.union(special_pieces))):
@@ -482,12 +485,12 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
                        max(1, int(round(len(tokens) * masked_lm_prob))))
 
   # Note(mingdachen):
-  # By default, we set the probilities to favor longer ngram sequences.
+  # By default, we set the probilities to favor shorter ngram sequences.
   ngrams = np.arange(1, FLAGS.ngram + 1, dtype=np.int64)
   pvals = 1. / np.arange(1, FLAGS.ngram + 1)
   pvals /= pvals.sum(keepdims=True)
 
-  if FLAGS.favor_shorter_ngram:
+  if not FLAGS.favor_shorter_ngram:
     pvals = pvals[::-1]
 
   ngram_indexes = []

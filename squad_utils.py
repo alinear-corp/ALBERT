@@ -17,21 +17,23 @@
 
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import google_type_annotations
+# from __future__ import google_type_annotations
 from __future__ import print_function
 import collections
 import json
 import math
 import re
 import string
-import modeling
-import optimization
-import tokenization
+import sys
+from albert import fine_tuning_utils
+from albert import modeling
+from albert import optimization
+from albert import tokenization
 import numpy as np
 import six
 from six.moves import map
 from six.moves import range
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import data as contrib_data
 from tensorflow.contrib import layers as contrib_layers
 from tensorflow.contrib import tpu as contrib_tpu
@@ -246,9 +248,10 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     tok_start_to_chartok_index = []
     tok_end_to_chartok_index = []
     char_cnt = 0
+    para_tokens = [six.ensure_text(token, "utf-8") for token in para_tokens]
     for i, token in enumerate(para_tokens):
-      new_token = six.ensure_binary(token).replace(
-          tokenization.SPIECE_UNDERLINE, b" ")
+      new_token = six.ensure_text(token).replace(
+          tokenization.SPIECE_UNDERLINE.decode("utf-8"), " ")
       chartok_to_tok_index.extend([i] * len(new_token))
       tok_start_to_chartok_index.append(char_cnt)
       char_cnt += len(new_token)
@@ -705,17 +708,18 @@ def input_fn_builder(input_file, seq_length, is_training,
 
 
 def create_v1_model(albert_config, is_training, input_ids, input_mask,
-                    segment_ids, use_one_hot_embeddings):
+                    segment_ids, use_one_hot_embeddings, use_einsum,
+                    hub_module):
   """Creates a classification model."""
-  model = modeling.AlbertModel(
-      config=albert_config,
+  (_, final_hidden) = fine_tuning_utils.create_albert(
+      albert_config=albert_config,
       is_training=is_training,
       input_ids=input_ids,
       input_mask=input_mask,
-      token_type_ids=segment_ids,
-      use_one_hot_embeddings=use_one_hot_embeddings)
-
-  final_hidden = model.get_sequence_output()
+      segment_ids=segment_ids,
+      use_one_hot_embeddings=use_one_hot_embeddings,
+      use_einsum=use_einsum,
+      hub_module=hub_module)
 
   final_hidden_shape = modeling.get_shape_list(final_hidden, expected_rank=3)
   batch_size = final_hidden_shape[0]
@@ -746,7 +750,7 @@ def create_v1_model(albert_config, is_training, input_ids, input_mask,
 
 def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
-                        use_one_hot_embeddings):
+                        use_one_hot_embeddings, use_einsum, hub_module):
   """Returns `model_fn` closure for TPUEstimator."""
 
   def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -756,7 +760,10 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
     for name in sorted(features.keys()):
       tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
 
-    unique_ids = features["unique_ids"]
+    if "unique_ids" in features:
+      unique_ids = features["unique_ids"]
+    else:
+      unique_ids = None
     input_ids = features["input_ids"]
     input_mask = features["input_mask"]
     segment_ids = features["segment_ids"]
@@ -769,7 +776,13 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_ids=input_ids,
         input_mask=input_mask,
         segment_ids=segment_ids,
-        use_one_hot_embeddings=use_one_hot_embeddings)
+        use_one_hot_embeddings=use_one_hot_embeddings,
+        use_einsum=use_einsum,
+        hub_module=hub_module)
+
+    # Assign names to the logits so that we can refer to them as output tensors.
+    start_logits = tf.identity(start_logits, name="start_logits")
+    end_logits = tf.identity(end_logits, name="end_logits")
 
     tvars = tf.trainable_variables()
 
@@ -826,16 +839,16 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
           scaffold_fn=scaffold_fn)
     elif mode == tf.estimator.ModeKeys.PREDICT:
       predictions = {
-          "unique_ids": unique_ids,
           "start_log_prob": start_logits,
           "end_log_prob": end_logits,
       }
+      if unique_ids is not None:
+        predictions["unique_ids"] = unique_ids
       output_spec = contrib_tpu.TPUEstimatorSpec(
           mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
     else:
       raise ValueError(
           "Only TRAIN and PREDICT modes are supported: %s" % (mode))
-
     return output_spec
 
   return model_fn
@@ -1416,17 +1429,19 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
 
 def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
-                    max_seq_length, start_n_top, end_n_top, dropout_prob):
+                    max_seq_length, start_n_top, end_n_top, dropout_prob,
+                    hub_module):
   """Creates a classification model."""
-  model = modeling.AlbertModel(
-      config=albert_config,
+  (_, output) = fine_tuning_utils.create_albert(
+      albert_config=albert_config,
       is_training=is_training,
       input_ids=input_ids,
       input_mask=input_mask,
-      token_type_ids=segment_ids,
-      use_one_hot_embeddings=use_one_hot_embeddings)
+      segment_ids=segment_ids,
+      use_one_hot_embeddings=use_one_hot_embeddings,
+      use_einsum=True,
+      hub_module=hub_module)
 
-  output = model.get_sequence_output()
   bsz = tf.shape(output)[0]
   return_dict = {}
   output = tf.transpose(output, [1, 0, 2])
@@ -1565,7 +1580,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
-                        end_n_top, dropout_prob):
+                        end_n_top, dropout_prob, hub_module):
   """Returns `model_fn` closure for TPUEstimator."""
 
   def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -1593,7 +1608,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         max_seq_length=max_seq_length,
         start_n_top=start_n_top,
         end_n_top=end_n_top,
-        dropout_prob=dropout_prob)
+        dropout_prob=dropout_prob,
+        hub_module=hub_module)
 
     tvars = tf.trainable_variables()
 
@@ -1665,14 +1681,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
           "end_top_log_probs": outputs["end_top_log_probs"],
           "cls_logits": outputs["cls_logits"]
       }
-
-      if use_tpu:
-        output_spec = contrib_tpu.TPUEstimatorSpec(
-            mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
-      else:
-        output_spec = tf.estimator.EstimatorSpec(
-            mode=mode, predictions=predictions)
-      return output_spec
+      output_spec = contrib_tpu.TPUEstimatorSpec(
+          mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
     else:
       raise ValueError(
           "Only TRAIN and PREDICT modes are supported: %s" % (mode))

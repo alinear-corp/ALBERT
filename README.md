@@ -1,18 +1,34 @@
 ALBERT
 ======
 
-***************New October 31, 2019 ***************
+***************New March 28, 2020 ***************
 
-Version 2 of ALBERT models is relased. TF-Hub modules are available:
+Add a colab [tutorial](https://github.com/google-research/albert/blob/master/albert_glue_fine_tuning_tutorial.ipynb) to run fine-tuning for GLUE datasets.
 
-- https://tfhub.dev/google/albert_base/2
-- https://tfhub.dev/google/albert_large/2
-- https://tfhub.dev/google/albert_xlarge/2
-- https://tfhub.dev/google/albert_xxlarge/2
+***************New January 7, 2020 ***************
+
+v2 TF-Hub models should be working now with TF 1.15, as we removed the
+native Einsum op from the graph. See updated TF-Hub links below.
+
+***************New December 30, 2019 ***************
+
+Chinese models are released. We would like to thank [CLUE team ](https://github.com/CLUEbenchmark/CLUE) for providing the training data.
+
+- [Base](https://storage.googleapis.com/albert_models/albert_base_zh.tar.gz)
+- [Large](https://storage.googleapis.com/albert_models/albert_large_zh.tar.gz)
+- [Xlarge](https://storage.googleapis.com/albert_models/albert_xlarge_zh.tar.gz)
+- [Xxlarge](https://storage.googleapis.com/albert_models/albert_xxlarge_zh.tar.gz)
+
+Version 2 of ALBERT models is released.
+
+- Base: [[Tar file](https://storage.googleapis.com/albert_models/albert_base_v2.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_base/3)]
+- Large: [[Tar file](https://storage.googleapis.com/albert_models/albert_large_v2.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_large/3)]
+- Xlarge: [[Tar file](https://storage.googleapis.com/albert_models/albert_xlarge_v2.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_xlarge/3)]
+- Xxlarge: [[Tar file](https://storage.googleapis.com/albert_models/albert_xxlarge_v2.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_xxlarge/3)]
 
 In this version, we apply 'no dropout', 'additional training data' and 'long training time' strategies to all models. We train ALBERT-base for 10M steps and other models for 3M steps.
 
-The result comparsion to the v1 models are as followings:
+The result comparison to the v1 models is as followings:
 
 |                | Average  | SQuAD1.1 | SQuAD2.0 | MNLI     | SST-2    | RACE     |
 |----------------|----------|----------|----------|----------|----------|----------|
@@ -27,9 +43,7 @@ The result comparsion to the v1 models are as followings:
 |ALBERT-xlarge   |85.5      |92.5/86.1 | 86.1/83.1|86.4      |92.4      | 74.8     |
 |ALBERT-xxlarge  |91.0      |94.8/89.3 | 90.2/87.4|90.8      |96.9      | 86.5     |
 
-The comparison shows that for ALBERT-base, ALBERT-large, and ALBERT-xlarge, v2 is much better than v1, indicating the importance of applying the above three strategies. On average, ALBERT-xxlarge is slightly worse than the v1, because of the following two reasons: 1) Training additional 1.5 M steps (the only difference between these two models are training for 1.5M steps and 3M steps) did not lead to significant performance improvement. 2) For v1, we did a little bit hyperparameter search among the parameters sets given by BERT, Roberta, and XLnet. For v2, we simply adopt the parameters from v1 except for RACE, where we use a learning rate of 1e-5 and 0 [ALBERT DR](https://arxiv.org/pdf/1909.11942.pdf) (droput rate for ALBERT in finetuning). The original (v1) RACE hyperpamter will cause model divergence for v2 models. Given that the downstream tasks are sensitive to the fine-tuning hyperparameters, we should be careful about so called slight improvements.
-
-
+The comparison shows that for ALBERT-base, ALBERT-large, and ALBERT-xlarge, v2 is much better than v1, indicating the importance of applying the above three strategies. On average, ALBERT-xxlarge is slightly worse than the v1, because of the following two reasons: 1) Training additional 1.5 M steps (the only difference between these two models is training for 1.5M steps and 3M steps) did not lead to significant performance improvement. 2) For v1, we did a little bit hyperparameter search among the parameters sets given by BERT, Roberta, and XLnet. For v2, we simply adopt the parameters from v1 except for RACE, where we use a learning rate of 1e-5 and 0 [ALBERT DR](https://arxiv.org/pdf/1909.11942.pdf) (dropout rate for ALBERT in finetuning). The original (v1) RACE hyperparameter will cause model divergence for v2 models. Given that the downstream tasks are sensitive to the fine-tuning hyperparameters, we should be careful about so called slight improvements.
 
 ALBERT is "A Lite" version of BERT, a popular unsupervised language
 representation learning algorithm. ALBERT uses parameter-reduction techniques
@@ -79,12 +93,12 @@ Pre-trained Models
 ==================
 TF-Hub modules are available:
 
-- https://tfhub.dev/google/albert_base/1
-- https://tfhub.dev/google/albert_large/1
-- https://tfhub.dev/google/albert_xlarge/1
-- https://tfhub.dev/google/albert_xxlarge/1
+- Base: [[Tar file](https://storage.googleapis.com/albert_models/albert_base_v1.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_base/1)]
+- Large: [[Tar file](https://storage.googleapis.com/albert_models/albert_large_v1.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_large/1)]
+- Xlarge: [[Tar file](https://storage.googleapis.com/albert_models/albert_xlarge_v1.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_xlarge/1)]
+- Xxlarge: [[Tar file](https://storage.googleapis.com/albert_models/albert_xxlarge_v1.tar.gz)] [[TF-Hub](https://tfhub.dev/google/albert_xxlarge/1)]
 
-Example usage of the TF-Hub module:
+Example usage of the TF-Hub module in code:
 
 ```
 tags = set()
@@ -106,34 +120,75 @@ albert_outputs = albert_module(
 output_layer = albert_outputs["pooled_output"]
 ```
 
-For a full example, see `run_classifier_with_tfhub.py`.
+Most of the fine-tuning scripts in this repository support TF-hub modules
+via the `--albert_hub_module_handle` flag.
 
 Pre-training Instructions
 =========================
-Use `run_pretraining.py` to pretrain ALBERT:
+To pretrain ALBERT, use `run_pretraining.py`:
 
 ```
 pip install -r albert/requirements.txt
 python -m albert.run_pretraining \
-    --output_dir="${OUTPUT_DIR}" \
-    --export_dir="${EXPORT_DIR}" \
+    --input_file=... \
+    --output_dir=... \
+    --init_checkpoint=... \
+    --albert_config_file=... \
     --do_train \
     --do_eval \
-    <additional flags>
+    --train_batch_size=4096 \
+    --eval_batch_size=64 \
+    --max_seq_length=512 \
+    --max_predictions_per_seq=20 \
+    --optimizer='lamb' \
+    --learning_rate=.00176 \
+    --num_train_steps=125000 \
+    --num_warmup_steps=3125 \
+    --save_checkpoints_steps=5000
 ```
 
-Fine-tuning Instructions
-========================
-For XNLI, COLA, MNLI, and MRPC, use `run_classifier_sp.py`:
+Fine-tuning on GLUE
+===================
+To fine-tune and evaluate a pretrained ALBERT on GLUE, please see the
+convenience script `run_glue.sh`.
+
+Lower-level use cases may want to use the `run_classifier.py` script directly.
+The `run_classifier.py` script is used both for fine-tuning and evaluation of
+ALBERT on individual GLUE benchmark tasks, such as MNLI:
 
 ```
 pip install -r albert/requirements.txt
-python -m albert.run_classifier_sp \
+python -m albert.run_classifier \
+  --data_dir=... \
+  --output_dir=... \
+  --init_checkpoint=... \
+  --albert_config_file=... \
+  --spm_model_file=... \
+  --do_train \
+  --do_eval \
+  --do_predict \
+  --do_lower_case \
+  --max_seq_length=128 \
+  --optimizer=adamw \
   --task_name=MNLI \
-  <additional flags>
+  --warmup_step=1000 \
+  --learning_rate=3e-5 \
+  --train_step=10000 \
+  --save_checkpoints_steps=100 \
+  --train_batch_size=128
 ```
 
-You should see some output like this:
+Good default flag values for each GLUE task can be found in `run_glue.sh`.
+
+You can fine-tune the model starting from TF-Hub modules instead of raw
+checkpoints by setting e.g.
+`--albert_hub_module_handle=https://tfhub.dev/google/albert_base/1` instead
+of `--init_checkpoint`.
+
+You can find the spm_model_file in the tar files or under the assets folder of
+the tf-hub module. The name of the model file is "30k-clean.model".
+
+After evaluation, the script should report some output like this:
 
 ```
 ***** Eval results *****
@@ -145,12 +200,120 @@ You should see some output like this:
   sentence_order_loss = ...
 ```
 
-You can also fine-tune the model starting from TF-Hub modules using
-`run_classifier_with_tfhub.py`:
+Fine-tuning on SQuAD
+====================
+To fine-tune and evaluate a pretrained model on SQuAD v1, use the
+`run_squad_v1.py` script:
 
 ```
 pip install -r albert/requirements.txt
-python -m albert.run_classifier_with_tfhub \
-  --albert_hub_module_handle=https://tfhub.dev/google/albert_base/1 \
-  <additional flags>
+python -m albert.run_squad_v1 \
+  --albert_config_file=... \
+  --output_dir=... \
+  --train_file=... \
+  --predict_file=... \
+  --train_feature_file=... \
+  --predict_feature_file=... \
+  --predict_feature_left_file=... \
+  --init_checkpoint=... \
+  --spm_model_file=... \
+  --do_lower_case \
+  --max_seq_length=384 \
+  --doc_stride=128 \
+  --max_query_length=64 \
+  --do_train=true \
+  --do_predict=true \
+  --train_batch_size=48 \
+  --predict_batch_size=8 \
+  --learning_rate=5e-5 \
+  --num_train_epochs=2.0 \
+  --warmup_proportion=.1 \
+  --save_checkpoints_steps=5000 \
+  --n_best_size=20 \
+  --max_answer_length=30
+```
+
+You can fine-tune the model starting from TF-Hub modules instead of raw
+checkpoints by setting e.g.
+`--albert_hub_module_handle=https://tfhub.dev/google/albert_base/1` instead
+of `--init_checkpoint`.
+
+For SQuAD v2, use the `run_squad_v2.py` script:
+
+```
+pip install -r albert/requirements.txt
+python -m albert.run_squad_v2 \
+  --albert_config_file=... \
+  --output_dir=... \
+  --train_file=... \
+  --predict_file=... \
+  --train_feature_file=... \
+  --predict_feature_file=... \
+  --predict_feature_left_file=... \
+  --init_checkpoint=... \
+  --spm_model_file=... \
+  --do_lower_case \
+  --max_seq_length=384 \
+  --doc_stride=128 \
+  --max_query_length=64 \
+  --do_train \
+  --do_predict \
+  --train_batch_size=48 \
+  --predict_batch_size=8 \
+  --learning_rate=5e-5 \
+  --num_train_epochs=2.0 \
+  --warmup_proportion=.1 \
+  --save_checkpoints_steps=5000 \
+  --n_best_size=20 \
+  --max_answer_length=30
+```
+
+You can fine-tune the model starting from TF-Hub modules instead of raw
+checkpoints by setting e.g.
+`--albert_hub_module_handle=https://tfhub.dev/google/albert_base/1` instead
+of `--init_checkpoint`.
+
+Fine-tuning on RACE
+===================
+For RACE, use the `run_race.py` script:
+
+```
+pip install -r albert/requirements.txt
+python -m albert.run_race \
+  --albert_config_file=... \
+  --output_dir=... \
+  --train_file=... \
+  --eval_file=... \
+  --data_dir=...\
+  --init_checkpoint=... \
+  --spm_model_file=... \
+  --max_seq_length=512 \
+  --max_qa_length=128 \
+  --do_train \
+  --do_eval \
+  --train_batch_size=32 \
+  --eval_batch_size=8 \
+  --learning_rate=1e-5 \
+  --train_step=12000 \
+  --warmup_step=1000 \
+  --save_checkpoints_steps=100
+```
+
+You can fine-tune the model starting from TF-Hub modules instead of raw
+checkpoints by setting e.g.
+`--albert_hub_module_handle=https://tfhub.dev/google/albert_base/1` instead
+of `--init_checkpoint`.
+
+SentencePiece
+=============
+Command for generating the sentence piece vocabulary:
+
+```
+spm_train \
+--input all.txt --model_prefix=30k-clean --vocab_size=30000 --logtostderr
+--pad_id=0 --unk_id=1 --eos_id=-1 --bos_id=-1
+--control_symbols=[CLS],[SEP],[MASK]
+--user_defined_symbols="(,),\",-,.,–,£,€"
+--shuffle_input_sentence=true --input_sentence_size=10000000
+--character_coverage=0.99995 --model_type=unigram
 ```
