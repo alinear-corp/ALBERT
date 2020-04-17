@@ -31,7 +31,7 @@ import sentencepiece as spm
 SPIECE_UNDERLINE = u"▁".encode("utf-8")
 
 
-def preprocess_text(inputs, remove_space=True, lower=False):
+def preprocess_text(inputs, remove_space=True, lower=False, keep_accents=False):
   """preprocess data by removing extra space and normalize data."""
   outputs = inputs
   if remove_space:
@@ -43,8 +43,9 @@ def preprocess_text(inputs, remove_space=True, lower=False):
     except UnicodeDecodeError:
       outputs = six.ensure_text(outputs, "latin-1")
 
-  outputs = unicodedata.normalize("NFKD", outputs)
-  outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
+  if not keep_accents:
+    outputs = unicodedata.normalize("NFKD", outputs)
+    outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
   if lower:
     outputs = outputs.lower()
 
